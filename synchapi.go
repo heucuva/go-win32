@@ -3,6 +3,7 @@
 package win32
 
 import (
+	"errors"
 	"os"
 	"sync/atomic"
 	"time"
@@ -37,15 +38,22 @@ func WaitForSingleObject(handle windows.Handle, duration time.Duration) error {
 	return internalWaitForSingleObject(handle, uint32(duration.Milliseconds()))
 }
 
+const WAIT_TIMEOUT = 0x00000102
+
+var (
+	WaitTimeout = errors.New("wait timeout")
+)
+
 func internalWaitForSingleObject(handle windows.Handle, duration uint32) error {
 	h := atomic.LoadUintptr((*uintptr)(&handle))
 	s, e := windows.WaitForSingleObject(windows.Handle(h), duration)
 	switch s {
 	case windows.WAIT_OBJECT_0:
 		// we're good
-	//case windows.WAIT_FAILED:
+		return nil
+	case WAIT_TIMEOUT: // HACK: should be windows.WAIT_TIMEOUT
+		return WaitTimeout
 	default:
 		return os.NewSyscallError("WaitForSingleObject", e)
 	}
-	return nil
 }
